@@ -62,3 +62,38 @@ similar_df
 
 # recommended movies
 similar_df[similar_df['number_of_ratings'] > 200].sort_values('correlations', ascending=False).head(20)
+
+# read new dataset containing movie attributes
+movie_attributes = pandas.read_csv("https://modcom.co.ke/datasets/Movie_Attributes.csv")
+
+# merge the new dataset with the existing dataset based on the 'item_id' column
+data = pandas.merge(data, movie_attributes, on='item_id')
+
+# create a new DataFrame with the 'item_id' and 'title' columns
+movie_info = data[['item_id', 'title']].drop_duplicates()
+
+# create a TF-IDF vectorizer to extract important keywords from the plot summary of each movie
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer(stop_words='english')
+
+# apply the TF-IDF vectorizer to the plot summary of each movie to obtain a sparse matrix
+plot_matrix = tfidf.fit_transform(data['plot'])
+
+# compute the cosine similarity between each pair of movies based on their sparse matrix
+from sklearn.metrics.pairwise import cosine_similarity
+cosine_similarities = cosine_similarity(plot_matrix)
+
+# for a selected movie, compute the cosine similarity between that movie and all other movies
+selected_movie_id = 123 # replace with the actual item_id of the selected movie
+selected_movie_index = movie_info[movie_info['item_id'] == selected_movie_id].index[0]
+similarities = list(enumerate(cosine_similarities[selected_movie_index]))
+
+# combine the similarity scores from collaborative filtering and content-based filtering using a weighted average
+alpha = 0.5 # weight for collaborative filtering
+beta = 0.5 # weight for content-based filtering
+combined_similarities = [(alpha * similar_df['correlations'][i]) + (beta * similarity) for i, similarity in similarities]
+
+# recommend the top N movies based on the combined similarity scores
+N = 20 # number of recommendations to generate
+recommended_indices = [i[0] for i in sorted(enumerate(combined_similarities), key=lambda x:x[1], reverse=True)[1:N+1]]
+recommended_movies = movie_info.iloc[recommended_indices]['title']
