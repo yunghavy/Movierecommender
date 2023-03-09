@@ -19,12 +19,17 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 
-user_item_details = pandas.read_csv("https://modcom.co.ke/datasets/file.csv")
-user_item_details
-
-
 # Load movie metadata
 movie_metadata = pd.read_csv("https://modcom.co.ke/datasets/movie_metadata.csv")
+
+# Load user-item ratings
+user_item_details = pd.read_csv("https://modcom.co.ke/datasets/file.csv")
+
+# Merge movie metadata with user-item ratings
+data = pd.merge(user_item_details, movie_metadata, on='movie_id')
+
+# Create a pivot table of the user-item ratings
+pivot = data.pivot_table(index='user_id', columns='title', values='rating')
 
 # Create a TF-IDF vectorizer to extract features from the movie overview text
 tfidf_vectorizer = TfidfVectorizer(stop_words='english')
@@ -34,7 +39,7 @@ tfidf_matrix = tfidf_vectorizer.fit_transform(movie_metadata['overview'].fillna(
 cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
 # Helper function to get movie recommendations based on content similarity
-def get_content_based_recommendations(title, cosine_sim=cosine_sim, movie_metadata=movie_metadata):
+def get_content_based_recommendations(user_id, title, cosine_sim=cosine_sim,  pivot=pivot, movie_metadata=movie_metadata):
     # Get the index of the movie
     idx = movie_metadata[movie_metadata['title'] == title].index[0]
 
@@ -51,7 +56,21 @@ def get_content_based_recommendations(title, cosine_sim=cosine_sim, movie_metada
     movie_indices = [i[0] for i in sim_scores]
     movie_titles = movie_metadata['title'].iloc[movie_indices].values
 
-    return movie_titles
+    # Get the user's ratings for all movies
+    user_ratings = pivot.loc[user_id]
+
+    #Get the similar movies rated by the user
+    similar_movies = pivot.corrwith(user_ratings).dropna()
+    similar_movies = similar_movies.sort_values(ascending=False)
+
+     # Get the top 10 most similar movies based on collaborative filtering
+    similar_movies = similar_movies[similar_movies.index.isin(movie_metadata['title'])]
+    movie_titles_collab = similar_movies.index[:10].values
+
+    # Combine the content-based and collaborative filtering recommendations
+    movie_titles_hybrid = list(set(movie_titles_content).union(set(movie_titles_collab)))
+
+    return movie_titles_hybrid
 
 
 # movie datasets
