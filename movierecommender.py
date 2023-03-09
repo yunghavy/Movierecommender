@@ -13,9 +13,46 @@ Original file is located at
 # content-based recommender -> done based on the customer experience
 
 
-import pandas
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+
 user_item_details = pandas.read_csv("https://modcom.co.ke/datasets/file.csv")
 user_item_details
+
+
+# Load movie metadata
+movie_metadata = pd.read_csv("https://modcom.co.ke/datasets/movie_metadata.csv")
+
+# Create a TF-IDF vectorizer to extract features from the movie overview text
+tfidf_vectorizer = TfidfVectorizer(stop_words='english')
+tfidf_matrix = tfidf_vectorizer.fit_transform(movie_metadata['overview'].fillna(''))
+
+# Compute cosine similarity between all movies
+cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+
+# Helper function to get movie recommendations based on content similarity
+def get_content_based_recommendations(title, cosine_sim=cosine_sim, movie_metadata=movie_metadata):
+    # Get the index of the movie
+    idx = movie_metadata[movie_metadata['title'] == title].index[0]
+
+    # Get the cosine similarity scores for all movies
+    sim_scores = list(enumerate(cosine_sim[idx]))
+
+    # Sort the movies based on the cosine similarity scores
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+
+    # Get the top 10 most similar movies
+    sim_scores = sim_scores[1:11]
+
+    # Get the movie titles from the indices
+    movie_indices = [i[0] for i in sim_scores]
+    movie_titles = movie_metadata['title'].iloc[movie_indices].values
+
+    return movie_titles
+
 
 # movie datasets
 
